@@ -1,0 +1,27 @@
+#+PROPERTY: header-args:sh :session *nanogui*
+
+* Generating resources
+
+  #+begin_src sh
+rm -rf ./include/nanogui_resources
+mkdir -p ./include/nanogui_resources
+outdir="include/nanogui_resources"
+
+
+xxd -i ./resources/Roboto-Regular.ttf > "$outdir/roboto_regular_ttf.h"
+sed -i 's/Roboto_Regular/roboto_regular/' "$outdir/roboto_regular_ttf.h"
+
+xxd -i ./resources/Roboto-Bold.ttf > "$outdir/roboto_bold_ttf.h"
+sed -i 's/Roboto_Bold/roboto_bold/' "$outdir/roboto_bold_ttf.h"
+
+xxd -i ./resources/FontAwesome-Solid.ttf > "$outdir/fontawesome_solid_ttf.h"
+sed -i 's/FontAwesome_Solid/fontawesome_solid/' "$outdir/fontawesome_solid_ttf.h"
+
+xxd -i ./resources/Inconsolata-Regular.ttf > "$outdir/inconsolata_regular_ttf.h"
+sed -i 's/Inconsolata_Regular/inconsolata_regular/' "$outdir/inconsolata_regular_ttf.h"
+
+xxd -i ./resources/imageview_vertex.gl > ./include/nanogui_resources/imageview_vertex.h
+xxd -i ./resources/imageview_fragment.gl > ./include/nanogui_resources/imageview_fragment.h
+
+ls "$outdir/"*.h | xargs -I{} sh -c 'echo {} && echo hi && sed -i "s/_len/_size/" {} && sed -i "s/__resources_//" {}'
+  #+end_src

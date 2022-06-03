@@ -4,6 +4,7 @@
 .DS_Store
 ext_build
 nanogui_resources.*
+nanogui_resources/
 build
 CMakeCache.txt
 CMakeFiles
