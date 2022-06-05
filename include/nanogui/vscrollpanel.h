@@ -49,8 +49,8 @@ public:
     virtual void draw(NVGcontext *ctx) override;
 
 protected:
-    int m_child_preferred_height;
-    Vector2f m_scroll{0.0,0.0};
+    Vector2i m_child_preferred_size;
+    Vector2f m_scroll;
     bool m_update_layout;
 };
 
