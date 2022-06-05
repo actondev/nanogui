@@ -32,19 +32,25 @@ void VScrollPanel::perform_layout(NVGcontext *ctx) {
 
     Widget *child = m_children[0];
     m_child_preferred_size = child->preferred_size(ctx);
+    printf("layout pref size %d %d\n", m_child_preferred_size[0], m_child_preferred_size[1]);
     m_overflow = m_child_preferred_size - m_size;
     m_overflow[0] = std::max(m_overflow[0], 0.f);
     m_overflow[1] = std::max(m_overflow[1], 0.f);
-    m_both_scrollbars = m_overflow[0] > 0 && m_overflow[1] > 0;
+    m_is_overflow = m_overflow[0] >0 || m_overflow[1] > 0;
+    m_both_scrollbars = m_is_overflow && m_overflow[0] > 0 && m_overflow[1] > 0;
 
-    if (m_overflow[0] > 0 || m_overflow[1] > 0) {
-      child->set_position(Vector2i(0, -m_scroll[1] * m_overflow[1]));
-        child->set_size(Vector2i(m_size.x() - m_scrollbar_size, m_child_preferred_size[1]));
+    if (m_is_overflow) {
+      child->set_position(-m_scroll* m_overflow);
+      // HACK to scroll with mouse drag????
+      child->set_size(Vector2i(m_size.x() - m_scrollbar_size, m_child_preferred_size[1]));
     } else {
         child->set_position(Vector2i(0));
         child->set_size(m_size);
-        // m_scroll[0] = 0;
+        m_scroll[0] = 0;
         m_scroll[1] = 0;
+        m_is_overflow = false;
+        m_overflow[0] = 0;
+        m_overflow[1] = 0;
     }
     child->perform_layout(ctx);
 }
