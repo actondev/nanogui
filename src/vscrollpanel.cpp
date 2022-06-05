@@ -32,12 +32,13 @@ void VScrollPanel::perform_layout(NVGcontext *ctx) {
     m_child_preferred_height = child->preferred_size(ctx).y();
 
     if (m_child_preferred_height > m_size.y()) {
-        child->set_position(Vector2i(0, -m_scroll * (m_child_preferred_height - m_size.y())));
+      child->set_position(Vector2i(0, -m_scroll[1] * (m_child_preferred_height - m_size.y())));
         child->set_size(Vector2i(m_size.x() - 12, m_child_preferred_height));
     } else {
         child->set_position(Vector2i(0));
         child->set_size(m_size);
-        m_scroll = 0;
+        // m_scroll[0] = 0;
+        m_scroll[1] = 0;
     }
     child->perform_layout(ctx);
 }
@@ -54,8 +55,8 @@ bool VScrollPanel::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
         float scrollh = height() *
             std::min(1.f, height() / (float) m_child_preferred_height);
 
-        m_scroll = std::max(0.f, std::min(1.f,
-                     m_scroll + rel.y() / (m_size.y() - 8.f - scrollh)));
+        m_scroll[1] = std::max(0.f, std::min(1.f,
+                     m_scroll[1] + rel.y() / (m_size.y() - 8.f - scrollh)));
         m_update_layout = true;
         return true;
     } else {
@@ -75,7 +76,7 @@ bool VScrollPanel::mouse_button_event(const Vector2i &p, int button, bool down,
 
         int scrollh = (int) (height() *
             std::min(1.f, height() / (float) m_child_preferred_height));
-        int start = (int) (m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll);
+        int start = (int) (m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll[1]);
 
         float delta = 0.f;
 
@@ -84,10 +85,10 @@ bool VScrollPanel::mouse_button_event(const Vector2i &p, int button, bool down,
         else if (p.y() > start + scrollh)
             delta = m_size.y() / (float) m_child_preferred_height;
 
-        m_scroll = std::max(0.f, std::min(1.f, m_scroll + delta*0.98f));
+        m_scroll[1] = std::max(0.f, std::min(1.f, m_scroll[1] + delta*0.98f));
 
         m_children[0]->set_position(
-            Vector2i(0, -m_scroll * (m_child_preferred_height - m_size.y())));
+            Vector2i(0, -m_scroll[1] * (m_child_preferred_height - m_size.y())));
         m_update_layout = true;
         return true;
     }
@@ -99,11 +100,11 @@ bool VScrollPanel::scroll_event(const Vector2i &p, const Vector2f &rel) {
         auto child = m_children[0];
         float scroll_amount = rel.y() * m_size.y() * .25f;
 
-        m_scroll = std::max(0.f, std::min(1.f,
-                m_scroll - scroll_amount / m_child_preferred_height));
+        m_scroll[1] = std::max(0.f, std::min(1.f,
+                m_scroll[1] - scroll_amount / m_child_preferred_height));
 
         Vector2i old_pos = child->position();
-        child->set_position(Vector2i(0, -m_scroll*(m_child_preferred_height - m_size.y())));
+        child->set_position(Vector2i(0, -m_scroll[1]*(m_child_preferred_height - m_size.y())));
         Vector2i new_pos = child->position();
         m_update_layout = true;
         child->mouse_motion_event(p-m_pos, old_pos - new_pos, 0, 0);
@@ -115,12 +116,13 @@ bool VScrollPanel::scroll_event(const Vector2i &p, const Vector2f &rel) {
 }
 
 void VScrollPanel::draw(NVGcontext *ctx) {
+  printf("scroll panel draw %d\n", m_children.size());
     if (m_children.empty())
         return;
     Widget *child = m_children[0];
     int yoffset = 0;
     if (m_child_preferred_height > m_size.y())
-        yoffset = -m_scroll*(m_child_preferred_height - m_size.y());
+        yoffset = -m_scroll[1]*(m_child_preferred_height - m_size.y());
     child->set_position(Vector2i(0, yoffset));
     m_child_preferred_height = child->preferred_size(ctx).y();
     float scrollh = height() *
@@ -152,12 +154,12 @@ void VScrollPanel::draw(NVGcontext *ctx) {
 
     paint = nvgBoxGradient(
         ctx, m_pos.x() + m_size.x() - 12 - 1,
-        m_pos.y() + 4 + (m_size.y() - 8 - scrollh) * m_scroll - 1, 8, scrollh,
+        m_pos.y() + 4 + (m_size.y() - 8 - scrollh) * m_scroll[1] - 1, 8, scrollh,
         3, 4, Color(220, 100), Color(128, 100));
 
     nvgBeginPath(ctx);
     nvgRoundedRect(ctx, m_pos.x() + m_size.x() - 12 + 1,
-                   m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll, 8 - 2,
+                   m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll[1], 8 - 2,
                    scrollh - 2, 2);
     nvgFillPaint(ctx, paint);
     nvgFill(ctx);
