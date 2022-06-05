@@ -10,17 +10,20 @@
     BSD-style license that can be found in the LICENSE.txt file.
 */
 
+#include "GLFW/glfw3.h"
 #include "nanogui/vector.h"
 #include "nanovg.h"
 #include <nanogui/vscrollpanel.h>
 #include <nanogui/theme.h>
 #include <nanogui/opengl.h>
+#include <nanogui/screen.h>
 
 NAMESPACE_BEGIN(nanogui)
 
 VScrollPanel::VScrollPanel(Widget *parent)
-: Widget(parent), m_child_preferred_size(0, 0),
-  m_scroll(0.f, 0.0f), m_scrollbar_size(10), m_arrow_size(1), m_update_layout(false) { }
+    : Widget(parent), m_child_preferred_size(0, 0), m_scroll(0.f, 0.0f),
+      m_scrollbar_size(10), m_arrow_size(1), m_is_overflow(false),
+      m_update_layout(false) {}
 
 void VScrollPanel::perform_layout(NVGcontext *ctx) {
     Widget::perform_layout(ctx);
@@ -41,8 +44,8 @@ void VScrollPanel::perform_layout(NVGcontext *ctx) {
 
     if (m_is_overflow) {
       child->set_position(-m_scroll* m_overflow);
-      // HACK to scroll with mouse drag????
-      child->set_size(Vector2i(m_size.x() - m_scrollbar_size, m_child_preferred_size[1]));
+      // If we don't set the size, we cannot get the mouse events (captured by the big child?)
+      child->set_size(Vector2i(m_size.x() - m_scrollbar_size, m_size.y() - m_scrollbar_size));
     } else {
         child->set_position(Vector2i(0));
         child->set_size(m_size);
@@ -58,56 +61,63 @@ void VScrollPanel::perform_layout(NVGcontext *ctx) {
 Vector2i VScrollPanel::preferred_size(NVGcontext *ctx) const {
     if (m_children.empty())
         return Vector2i(0);
-    return m_children[0]->preferred_size(ctx) + Vector2i(12, 0);
+    return m_children[0]->preferred_size(ctx) + Vector2i(m_scrollbar_size, 0);
 }
 
 bool VScrollPanel::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
                                     int button, int modifiers) {
-  printf("mouse drag\n");
-    if (!m_children.empty() && m_child_preferred_size[1] > m_size.y()) {
-        float scrollh = height() *
-            std::min(1.f, height() / (float) m_child_preferred_size[1]);
+  printf("mouse drag scrolling?\n");
 
-        m_scroll[1] = std::max(0.f, std::min(1.f,
-                     m_scroll[1] + rel.y() / (m_size.y() - 8.f - scrollh)));
-        m_update_layout = true;
-        return true;
-    } else {
-        return Widget::mouse_drag_event(p, rel, button, modifiers);
-    }
+  if (!m_children.empty() && m_is_overflow) {
+    float scrollh =
+        height() * std::min(1.f, height() / (float)m_child_preferred_size[1]);
+
+    m_scroll[1] = std::max(
+        0.f,
+        std::min(1.f, m_scroll[1] + rel.y() / (m_size.y() - 8.f - scrollh)));
+    m_update_layout = true;
+    return true;
+  } else {
+    return Widget::mouse_drag_event(p, rel, button, modifiers);
+  }
 }
 
 bool VScrollPanel::mouse_button_event(const Vector2i &p, int button, bool down,
                                       int modifiers) {
+  printf("mouse button\n");
   if (Widget::mouse_button_event(p, button, down, modifiers)) {
-    printf("here button true\n");
-        return true;
+    printf("handled mouse by children?\n");
+    return true;
+  }
+  if(m_children.empty() || !m_is_overflow) {
+    return false;
   }
 
-    if (down && button == GLFW_MOUSE_BUTTON_1 && !m_children.empty() &&
-        m_child_preferred_size[1] > m_size.y() &&
-        p.x() > m_pos.x() + m_size.x() - 13 &&
-        p.x() < m_pos.x() + m_size.x() - 4) {
-      printf("here handle mouse\n");
+  if (down && button == GLFW_MOUSE_BUTTON_1 && !m_children.empty() &&
+     m_is_overflow &&
+      p.x() > m_pos.x() + m_size.x() - 13 &&
+      p.x() < m_pos.x() + m_size.x() - 4) {
 
-        int scrollh = (int) (height() *
-            std::min(1.f, height() / (float) m_child_preferred_size[1]));
-        int start = (int) (m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll[1]);
+    int scrollh =
+        (int)(height() *
+              std::min(1.f, height() / (float)m_child_preferred_size[1]));
+    int start =
+        (int)(m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll[1]);
 
-        float delta = 0.f;
+    float delta = 0.f;
 
-        if (p.y() < start)
-            delta = -m_size.y() / (float) m_child_preferred_size[1];
-        else if (p.y() > start + scrollh)
-            delta = m_size.y() / (float) m_child_preferred_size[1];
+    if (p.y() < start)
+      delta = -m_size.y() / (float)m_child_preferred_size[1];
+    else if (p.y() > start + scrollh)
+      delta = m_size.y() / (float)m_child_preferred_size[1];
 
-        m_scroll[1] = std::max(0.f, std::min(1.f, m_scroll[1] + delta*0.98f));
+    m_scroll[1] = std::max(0.f, std::min(1.f, m_scroll[1] + delta * 0.98f));
 
-        m_children[0]->set_position(
-            Vector2i(0, -m_scroll[1] * (m_child_preferred_size[1] - m_size.y())));
-        m_update_layout = true;
-        return true;
-    }
+    m_children[0]->set_position(
+        Vector2i(0, -m_scroll[1] * (m_child_preferred_size[1] - m_size.y())));
+    m_update_layout = true;
+    return true;
+  }
     return false;
 }
 
@@ -120,7 +130,7 @@ bool VScrollPanel::scroll_event(const Vector2i &p, const Vector2f &rel) {
   int mods = 0;
   Screen* parent_screen = screen();
   if(parent_screen) {
-    // mods = parent_screen->keyboard_mods();
+    mods = parent_screen->keyboard_mods();
   }
   printf("scroll modifiers %d rel %f %f\n", mods, rel[0], rel[1]);
   // TODO check mouse modifier: with shift we scroll horizontally,
@@ -158,24 +168,24 @@ void VScrollPanel::draw(NVGcontext *ctx) {
     Widget *child = m_children[0];
     Vector2f offset = -m_scroll*m_overflow;
     child->set_position(offset);
-    // printf("child pref size %d %d\n", child->preferred_size(ctx)[0], child->preferred_size(ctx)[1]);
+
+    // TODO should we update the child preferred size here?
     // m_child_preferred_size = child->preferred_size(ctx);
-m_child_preferred_size[1] = child->preferred_size(ctx).y();
-// -    float scrollh = height() *
-// -        std::min(1.f, height() / (float) m_child_preferred_size[1]);
 
     if (m_update_layout) {
-        m_update_layout = false;
-        child->perform_layout(ctx);
+      m_update_layout = false;
+      child->perform_layout(ctx);
     }
 
     nvgSave(ctx);
     nvgTranslate(ctx, m_pos.x(), m_pos.y());
     nvgIntersectScissor(ctx, 0, 0, m_size.x(), m_size.y());
     if (child->visible())
-        child->draw(ctx);
+      child->draw(ctx);
     nvgRestore(ctx);
 
+    if (!m_is_overflow)
+      return;
     if (m_overflow[0] >0) {
       // horizontal scrollbar
       draw_scrollbar(ctx, Axis::X);
