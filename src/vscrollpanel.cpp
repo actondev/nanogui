@@ -10,6 +10,8 @@
     BSD-style license that can be found in the LICENSE.txt file.
 */
 
+#include "nanogui/vector.h"
+#include "nanovg.h"
 #include <nanogui/vscrollpanel.h>
 #include <nanogui/theme.h>
 #include <nanogui/opengl.h>
@@ -18,7 +20,7 @@ NAMESPACE_BEGIN(nanogui)
 
 VScrollPanel::VScrollPanel(Widget *parent)
 : Widget(parent), m_child_preferred_size(0, 0),
-  m_scroll(0.f, 0.0f), m_update_layout(false) { }
+  m_scroll(0.f, 0.0f), m_scrollbar_width(30), m_update_layout(false) { }
 
 void VScrollPanel::perform_layout(NVGcontext *ctx) {
     Widget::perform_layout(ctx);
@@ -30,10 +32,13 @@ void VScrollPanel::perform_layout(NVGcontext *ctx) {
 
     Widget *child = m_children[0];
     m_child_preferred_size = child->preferred_size(ctx);
-    Vector2i overflow = m_child_preferred_size - m_size;
-    if (overflow[1] > 0) {
-      child->set_position(Vector2i(0, -m_scroll[1] * (m_child_preferred_size[1] - m_size.y())));
-        child->set_size(Vector2i(m_size.x() - 12, m_child_preferred_size[1]));
+    m_overflow = m_child_preferred_size - m_size;
+    m_overflow[0] = std::max(m_overflow[0], 0.f);
+    m_overflow[1] = std::max(m_overflow[1], 0.f);
+
+    if (m_overflow[0] > 0 || m_overflow[1] > 0) {
+      child->set_position(Vector2i(0, -m_scroll[1] * m_overflow[1]));
+        child->set_size(Vector2i(m_size.x() - m_scrollbar_width, m_child_preferred_size[1]));
     } else {
         child->set_position(Vector2i(0));
         child->set_size(m_size);
@@ -116,14 +121,11 @@ bool VScrollPanel::scroll_event(const Vector2i &p, const Vector2f &rel) {
 }
 
 void VScrollPanel::draw(NVGcontext *ctx) {
-  printf("scroll panel draw %d\n", m_children.size());
     if (m_children.empty())
         return;
     Widget *child = m_children[0];
-    int yoffset = 0;
-    if (m_child_preferred_size[1] > m_size.y())
-        yoffset = -m_scroll[1]*(m_child_preferred_size[1] - m_size.y());
-    child->set_position(Vector2i(0, yoffset));
+    Vector2f offset = -m_scroll*m_overflow;
+    child->set_position(offset);
     m_child_preferred_size[1] = child->preferred_size(ctx).y();
     float scrollh = height() *
         std::min(1.f, height() / (float) m_child_preferred_size[1]);
@@ -143,26 +145,40 @@ void VScrollPanel::draw(NVGcontext *ctx) {
     if (m_child_preferred_size[1] <= m_size.y())
         return;
 
-    NVGpaint paint = nvgBoxGradient(
-        ctx, m_pos.x() + m_size.x() - 12 + 1, m_pos.y() + 4 + 1, 8,
-        m_size.y() - 8, 3, 4, Color(0, 32), Color(0, 92));
+    // const Vector2i scroll_max = ImMax((ImS64)1, size_contents_v - size_avail_v);
+    Vector2i scroll_max = m_child_preferred_size - m_size;
+    scroll_max[0] = std::max(0, scroll_max[0]);
+    scroll_max[1] = std::max(0, scroll_max[1]);
+    
+    // Vector2f scroll_ratio = m_scroll / Vector2f(scroll_max[0], scroll_max[1]));
+    // Vector2f grab_v_norm = scroll_ratio * (m_scrollbar_size - grab_h_pixels) / scrollbar_size_v; // Grab position in normalized
+    // NVGpaint paint = nvgBoxGradient(
+        // ctx, m_pos.x() + m_size.x() - m_scrollbar_width + 1, m_pos.y() + 4 + 1, 0,
+        // m_size.y(), 3, 4, Color(0, 32), Color(0, 92));
+    // NVGcolor bg;
+    nvgFillColor(ctx, nvgRGBf(0,0,0));
     nvgBeginPath(ctx);
-    nvgRoundedRect(ctx, m_pos.x() + m_size.x() - 12, m_pos.y() + 4, 8,
-                   m_size.y() - 8, 3);
-    nvgFillPaint(ctx, paint);
+    nvgRect(ctx, m_pos.x() + m_size.x() - m_scrollbar_width, m_pos.y() + 4, 0,
+                   m_size.y());
+    // nvgFillPaint(ctx, paint);
     nvgFill(ctx);
 
-    paint = nvgBoxGradient(
-        ctx, m_pos.x() + m_size.x() - 12 - 1,
-        m_pos.y() + 4 + (m_size.y() - 8 - scrollh) * m_scroll[1] - 1, 8, scrollh,
-        3, 4, Color(220, 100), Color(128, 100));
+    // paint = nvgBoxGradient(
+        // ctx, m_pos.x() + m_size.x() - m_scrollbar_width - 1,
+        // m_pos.y() + 4 + (m_size.y() - 8 - scrollh) * m_scroll[1] - 1, 8, scrollh,
+        // 3, 4, Color(220, 100), Color(128, 100));
 
+    nvgFillColor(ctx, nvgRGBf(0.5,0.5,0.5));
     nvgBeginPath(ctx);
-    nvgRoundedRect(ctx, m_pos.x() + m_size.x() - 12 + 1,
+    nvgRect(ctx, m_pos.x() + m_size.x() - m_scrollbar_width + 1,
                    m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll[1], 8 - 2,
-                   scrollh - 2, 2);
-    nvgFillPaint(ctx, paint);
+                   scrollh - 2);
+    // nvgFillPaint(ctx, paint);
     nvgFill(ctx);
 }
+void VScrollPanel::draw_scrollbar(NVGcontext *ctx, Axis axis) {
+
+}
+
 
 NAMESPACE_END(nanogui)
