@@ -57,6 +57,7 @@ Vector2i VScrollPanel::preferred_size(NVGcontext *ctx) const {
 
 bool VScrollPanel::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
                                     int button, int modifiers) {
+  printf("mouse drag\n");
     if (!m_children.empty() && m_child_preferred_size[1] > m_size.y()) {
         float scrollh = height() *
             std::min(1.f, height() / (float) m_child_preferred_size[1]);
@@ -72,13 +73,16 @@ bool VScrollPanel::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
 
 bool VScrollPanel::mouse_button_event(const Vector2i &p, int button, bool down,
                                       int modifiers) {
-    if (Widget::mouse_button_event(p, button, down, modifiers))
+  if (Widget::mouse_button_event(p, button, down, modifiers)) {
+    printf("here button true\n");
         return true;
+  }
 
     if (down && button == GLFW_MOUSE_BUTTON_1 && !m_children.empty() &&
         m_child_preferred_size[1] > m_size.y() &&
         p.x() > m_pos.x() + m_size.x() - 13 &&
         p.x() < m_pos.x() + m_size.x() - 4) {
+      printf("here handle mouse\n");
 
         int scrollh = (int) (height() *
             std::min(1.f, height() / (float) m_child_preferred_size[1]));
