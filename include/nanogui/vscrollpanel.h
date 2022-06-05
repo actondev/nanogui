@@ -49,9 +49,18 @@ public:
     virtual void draw(NVGcontext *ctx) override;
 
 protected:
-    Vector2i m_child_preferred_size;
-    Vector2f m_scroll;
-    bool m_update_layout;
+      enum Axis { X = 0, Y = 1 };
+      
+    void draw_scrollbar(NVGcontext *ctx, Axis axis);
+
+      Vector2i m_child_preferred_size;
+  Vector2f m_scroll;
+  Vector2f m_overflow;
+  bool m_both_scrollbars;
+  bool m_update_layout;
+  int m_scrollbar_size;
+  int m_arrow_size;
+
 };
 
 NAMESPACE_END(nanogui)

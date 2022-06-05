@@ -20,7 +20,7 @@ NAMESPACE_BEGIN(nanogui)
 
 VScrollPanel::VScrollPanel(Widget *parent)
 : Widget(parent), m_child_preferred_size(0, 0),
-  m_scroll(0.f, 0.0f), m_scrollbar_width(30), m_update_layout(false) { }
+  m_scroll(0.f, 0.0f), m_scrollbar_size(10), m_arrow_size(1), m_update_layout(false) { }
 
 void VScrollPanel::perform_layout(NVGcontext *ctx) {
     Widget::perform_layout(ctx);
@@ -35,10 +35,11 @@ void VScrollPanel::perform_layout(NVGcontext *ctx) {
     m_overflow = m_child_preferred_size - m_size;
     m_overflow[0] = std::max(m_overflow[0], 0.f);
     m_overflow[1] = std::max(m_overflow[1], 0.f);
+    m_both_scrollbars = m_overflow[0] > 0 && m_overflow[1] > 0;
 
     if (m_overflow[0] > 0 || m_overflow[1] > 0) {
       child->set_position(Vector2i(0, -m_scroll[1] * m_overflow[1]));
-        child->set_size(Vector2i(m_size.x() - m_scrollbar_width, m_child_preferred_size[1]));
+        child->set_size(Vector2i(m_size.x() - m_scrollbar_size, m_child_preferred_size[1]));
     } else {
         child->set_position(Vector2i(0));
         child->set_size(m_size);
@@ -142,42 +143,63 @@ void VScrollPanel::draw(NVGcontext *ctx) {
         child->draw(ctx);
     nvgRestore(ctx);
 
-    if (m_child_preferred_size[1] <= m_size.y())
-        return;
-
-    // const Vector2i scroll_max = ImMax((ImS64)1, size_contents_v - size_avail_v);
-    Vector2i scroll_max = m_child_preferred_size - m_size;
-    scroll_max[0] = std::max(0, scroll_max[0]);
-    scroll_max[1] = std::max(0, scroll_max[1]);
-    
-    // Vector2f scroll_ratio = m_scroll / Vector2f(scroll_max[0], scroll_max[1]));
-    // Vector2f grab_v_norm = scroll_ratio * (m_scrollbar_size - grab_h_pixels) / scrollbar_size_v; // Grab position in normalized
-    // NVGpaint paint = nvgBoxGradient(
-        // ctx, m_pos.x() + m_size.x() - m_scrollbar_width + 1, m_pos.y() + 4 + 1, 0,
-        // m_size.y(), 3, 4, Color(0, 32), Color(0, 92));
-    // NVGcolor bg;
-    nvgFillColor(ctx, nvgRGBf(0,0,0));
-    nvgBeginPath(ctx);
-    nvgRect(ctx, m_pos.x() + m_size.x() - m_scrollbar_width, m_pos.y() + 4, 0,
-                   m_size.y());
-    // nvgFillPaint(ctx, paint);
-    nvgFill(ctx);
-
-    // paint = nvgBoxGradient(
-        // ctx, m_pos.x() + m_size.x() - m_scrollbar_width - 1,
-        // m_pos.y() + 4 + (m_size.y() - 8 - scrollh) * m_scroll[1] - 1, 8, scrollh,
-        // 3, 4, Color(220, 100), Color(128, 100));
-
-    nvgFillColor(ctx, nvgRGBf(0.5,0.5,0.5));
-    nvgBeginPath(ctx);
-    nvgRect(ctx, m_pos.x() + m_size.x() - m_scrollbar_width + 1,
-                   m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll[1], 8 - 2,
-                   scrollh - 2);
-    // nvgFillPaint(ctx, paint);
-    nvgFill(ctx);
+    if (m_overflow[0] >0) {
+      // horizontal scrollbar
+      draw_scrollbar(ctx, Axis::X);
+    }
+    if (m_overflow[1] > 0) {
+      // vertical scrollbar
+      draw_scrollbar(ctx, Axis::Y);
+    }
+    return;
 }
 void VScrollPanel::draw_scrollbar(NVGcontext *ctx, Axis axis) {
+  // https://stackoverflow.com/a/16367035/8720686
+  float viewable_ratio = (float)m_size[axis] / (float)m_child_preferred_size[axis];
+  int scrollbar_area = m_size[axis] - 2*m_arrow_size;
+  if(m_both_scrollbars) {
+    scrollbar_area -= m_scrollbar_size;
+  }
 
+  int thumb_size = scrollbar_area * viewable_ratio;
+  int thumb_position = m_scroll[axis] * (scrollbar_area - thumb_size);
+
+  Axis other_axis = axis == Axis::X ? Axis::Y : Axis::X;
+
+  Vector2i v_scrollbar_pos;
+  v_scrollbar_pos[axis] = m_pos[axis];
+  // for the vertical scrollbar [1], we draw x [0] at the right side (offsetting the scrollbar size)
+  v_scrollbar_pos[other_axis] = m_pos[other_axis] + m_size[other_axis] - m_scrollbar_size;
+
+  Vector2i v_scrollbar_size;
+  v_scrollbar_size[axis] = m_size[axis];
+  if(m_both_scrollbars) {
+    v_scrollbar_size[axis] -= m_scrollbar_size;
+  }
+  v_scrollbar_size[other_axis] = m_scrollbar_size;
+
+  Vector2i v_thumb_size;
+  v_thumb_size[axis] = thumb_size;
+  v_thumb_size[other_axis] = m_scrollbar_size;
+
+  Vector2i v_thumb_position;
+  v_thumb_position[axis] = m_pos[axis] + m_arrow_size + thumb_position;
+  v_thumb_position[other_axis] = v_scrollbar_pos[other_axis] + 1;
+
+  // background
+  nvgFillColor(ctx, nvgRGBf(0, 0, 0));
+  nvgBeginPath(ctx);
+  nvgRect(ctx, v_scrollbar_pos[0], v_scrollbar_pos[1], v_scrollbar_size[0],
+          v_scrollbar_size[1]);
+  nvgFill(ctx);
+
+  // thumb
+  nvgFillColor(ctx, nvgRGBf(0.5, 0.5, 0.5));
+  nvgBeginPath(ctx);
+  nvgRect(ctx,
+          v_thumb_position[0], v_thumb_position[1], //
+          v_thumb_size[0], v_thumb_size[1]);
+  nvgFill(ctx);
 }
 
 
