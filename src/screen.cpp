@@ -481,6 +481,7 @@ void Screen::initialize(GLFWwindow *window, bool shutdown_glfw) {
     m_last_interaction = glfwGetTime();
     m_process_events = true;
     m_redraw = true;
+    m_keyboard_mods = 0;
     __nanogui_screens[m_glfw_window] = this;
 
     for (size_t i = 0; i < (size_t) Cursor::CursorCount; ++i)
@@ -823,6 +824,43 @@ void Screen::mouse_button_callback_event(int button, int action, int modifiers) 
 
 void Screen::key_callback_event(int key, int scancode, int action, int mods) {
     m_last_interaction = glfwGetTime();
+    switch (key) {
+    case GLFW_KEY_LEFT_SHIFT:
+      if (action) {
+        m_keyboard_mods |= GLFW_MOD_SHIFT;
+      } else {
+        m_keyboard_mods &= ~GLFW_MOD_SHIFT;
+      }
+      break;
+    case GLFW_KEY_LEFT_CONTROL:
+      if (action) {
+        m_keyboard_mods |= GLFW_MOD_CONTROL;
+      } else {
+        m_keyboard_mods &= ~GLFW_MOD_CONTROL;
+      }
+      break;
+    case GLFW_KEY_LEFT_ALT:
+      if (action) {
+        m_keyboard_mods |= GLFW_MOD_ALT;
+      } else {
+        m_keyboard_mods &= ~GLFW_MOD_ALT;
+      }
+      break;
+    case GLFW_KEY_LEFT_SUPER:
+      if (action) {
+        m_keyboard_mods |= GLFW_MOD_SUPER;
+      } else {
+        m_keyboard_mods &= ~GLFW_MOD_SUPER;
+      }
+      break;
+    case GLFW_KEY_CAPS_LOCK:
+      if (action) {
+        m_keyboard_mods |= GLFW_MOD_CAPS_LOCK;
+      } else {
+        m_keyboard_mods &= ~GLFW_MOD_CAPS_LOCK;
+      }
+      break;
+    }
     try {
         m_redraw |= keyboard_event(key, scancode, action, mods);
     } catch (const std::exception &e) {

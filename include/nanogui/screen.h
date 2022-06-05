@@ -183,6 +183,9 @@ public:
     /// Return the last observed mouse position value
     Vector2i mouse_pos() const { return m_mouse_pos; }
 
+    /// Return the active keyboard mods
+    int keyboard_mods() const { return m_keyboard_mods; }
+
     /// Return a pointer to the underlying GLFW window data structure
     GLFWwindow *glfw_window() const { return m_glfw_window; }
 
@@ -290,6 +293,7 @@ protected:
     bool m_stencil_buffer;
     bool m_float_buffer;
     bool m_redraw;
+    int m_keyboard_mods;
     std::function<void(Vector2i)> m_resize_callback;
 #if defined(NANOGUI_USE_METAL)
     void *m_metal_texture = nullptr;
