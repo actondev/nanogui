@@ -106,23 +106,44 @@ bool VScrollPanel::mouse_button_event(const Vector2i &p, int button, bool down,
 }
 
 bool VScrollPanel::scroll_event(const Vector2i &p, const Vector2f &rel) {
-    if (!m_children.empty() && m_child_preferred_size[1] > m_size.y()) {
-        auto child = m_children[0];
-        float scroll_amount = rel.y() * m_size.y() * .25f;
+  if(m_children.empty() || !m_is_overflow) {
+    // we do not handle the event here
+    return Widget::scroll_event(p, rel);
+  }
+  // GLFW_MOD_SHIFT
+  int mods = 0;
+  Screen* parent_screen = screen();
+  if(parent_screen) {
+    // mods = parent_screen->keyboard_mods();
+  }
+  printf("scroll modifiers %d rel %f %f\n", mods, rel[0], rel[1]);
+  // TODO check mouse modifier: with shift we scroll horizontally,
+  // otherwise vertically
+  bool is_horizontal = rel[0] != 0.f || (rel[1] != 0.f && mods == GLFW_MOD_SHIFT );
 
-        m_scroll[1] = std::max(0.f, std::min(1.f,
-                m_scroll[1] - scroll_amount / m_child_preferred_size[1]));
+  float scroll_delta = is_horizontal ? (rel[0] != 0.f ? rel[0] : rel[1]) : rel[1];
+  if (m_overflow[1] > 0 && !is_horizontal) {
+    float scroll_amount = scroll_delta * m_size[1] * .25f;
+    m_scroll[1] = std::max(
+        0.f,
+        std::min(1.f, m_scroll[1] - scroll_amount / m_child_preferred_size[1]));
 
-        Vector2i old_pos = child->position();
-        child->set_position(Vector2i(0, -m_scroll[1]*(m_child_preferred_size[1] - m_size.y())));
-        Vector2i new_pos = child->position();
-        m_update_layout = true;
-        child->mouse_motion_event(p-m_pos, old_pos - new_pos, 0, 0);
+    // NB: there was a mouse_motion event sent to the first child (m_children[0]) in the previous nanogui code
+    return true;
+  }
 
-        return true;
-    } else {
-        return Widget::scroll_event(p, rel);
-    }
+  if(m_overflow[0] && is_horizontal) {
+    float scroll_amount = scroll_delta * m_size[0] * .25f;
+
+    m_scroll[0] = std::max(
+        0.f,
+        std::min(1.f, m_scroll[0] - scroll_amount / m_child_preferred_size[0]));
+
+    m_update_layout = true;
+    return true;
+  }
+
+  return Widget::scroll_event(p, rel);
 }
 
 void VScrollPanel::draw(NVGcontext *ctx) {
@@ -131,9 +152,11 @@ void VScrollPanel::draw(NVGcontext *ctx) {
     Widget *child = m_children[0];
     Vector2f offset = -m_scroll*m_overflow;
     child->set_position(offset);
-    m_child_preferred_size[1] = child->preferred_size(ctx).y();
-    float scrollh = height() *
-        std::min(1.f, height() / (float) m_child_preferred_size[1]);
+    // printf("child pref size %d %d\n", child->preferred_size(ctx)[0], child->preferred_size(ctx)[1]);
+    // m_child_preferred_size = child->preferred_size(ctx);
+m_child_preferred_size[1] = child->preferred_size(ctx).y();
+// -    float scrollh = height() *
+// -        std::min(1.f, height() / (float) m_child_preferred_size[1]);
 
     if (m_update_layout) {
         m_update_layout = false;
