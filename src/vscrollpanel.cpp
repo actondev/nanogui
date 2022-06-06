@@ -35,7 +35,6 @@ void VScrollPanel::perform_layout(NVGcontext *ctx) {
 
     Widget *child = m_children[0];
     m_child_preferred_size = child->preferred_size(ctx);
-    printf("layout pref size %d %d\n", m_child_preferred_size[0], m_child_preferred_size[1]);
     m_overflow = m_child_preferred_size - m_size;
     m_overflow[0] = std::max(m_overflow[0], 0.f);
     m_overflow[1] = std::max(m_overflow[1], 0.f);
@@ -66,59 +65,73 @@ Vector2i VScrollPanel::preferred_size(NVGcontext *ctx) const {
 
 bool VScrollPanel::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
                                     int button, int modifiers) {
-  printf("mouse drag scrolling?\n");
-
-  if (!m_children.empty() && m_is_overflow) {
-    float scrollh =
-        height() * std::min(1.f, height() / (float)m_child_preferred_size[1]);
-
-    m_scroll[1] = std::max(
-        0.f,
-        std::min(1.f, m_scroll[1] + rel.y() / (m_size.y() - 8.f - scrollh)));
-    m_update_layout = true;
-    return true;
-  } else {
+  if(m_children.empty()) {
     return Widget::mouse_drag_event(p, rel, button, modifiers);
   }
+  if(!m_is_overflow) {
+    return m_children[0]->mouse_drag_event(p, rel, button, modifiers);
+  }
+  if(m_state != ClickedHScrollBar && m_state != ClickedVScrollbar) {
+    return false;
+  }
+  int axis = m_state == ClickedVScrollbar ? 1 : 0;
+  float scroll =
+      m_size[axis] *
+      std::min(1.f, m_size[axis] / (float)m_child_preferred_size[axis]);
+
+  m_scroll[axis] =
+      std::max(0.f, std::min(1.f, m_scroll[axis] + rel[axis] / (m_size[axis] -
+                                                                8.f - scroll)));
+  m_update_layout = true;
+
+  return true;
 }
 
 bool VScrollPanel::mouse_button_event(const Vector2i &p, int button, bool down,
                                       int modifiers) {
-  printf("mouse button\n");
   if (Widget::mouse_button_event(p, button, down, modifiers)) {
-    printf("handled mouse by children?\n");
     return true;
   }
   if(m_children.empty() || !m_is_overflow) {
     return false;
   }
-
-  if (down && button == GLFW_MOUSE_BUTTON_1 && !m_children.empty() &&
-     m_is_overflow &&
-      p.x() > m_pos.x() + m_size.x() - 13 &&
-      p.x() < m_pos.x() + m_size.x() - 4) {
-
-    int scrollh =
-        (int)(height() *
-              std::min(1.f, height() / (float)m_child_preferred_size[1]));
-    int start =
-        (int)(m_pos.y() + 4 + 1 + (m_size.y() - 8 - scrollh) * m_scroll[1]);
-
-    float delta = 0.f;
-
-    if (p.y() < start)
-      delta = -m_size.y() / (float)m_child_preferred_size[1];
-    else if (p.y() > start + scrollh)
-      delta = m_size.y() / (float)m_child_preferred_size[1];
-
-    m_scroll[1] = std::max(0.f, std::min(1.f, m_scroll[1] + delta * 0.98f));
-
-    m_children[0]->set_position(
-        Vector2i(0, -m_scroll[1] * (m_child_preferred_size[1] - m_size.y())));
-    m_update_layout = true;
-    return true;
-  }
+  if(!down || button != GLFW_MOUSE_BUTTON_1) {
+    m_state = Normal;
     return false;
+  }
+
+  bool clicked_vscrollbar = p[0] > m_pos[0] + m_size[0] - m_scrollbar_size;
+  bool clicked_hscrollbar = p[1] > m_pos[1] + m_size[1] - m_scrollbar_size;
+  if(!clicked_hscrollbar && !clicked_vscrollbar) {
+    m_state = Normal;
+    return m_children[0]->mouse_button_event(p, button, down, modifiers);
+  }
+
+  if(clicked_hscrollbar) {
+    m_state = ClickedHScrollBar;
+  } else {
+    m_state = ClickedVScrollbar;
+  }
+
+  int axis = clicked_vscrollbar ? 1 : 0;
+  int scroll =
+      (int)(m_size[axis] *
+            std::min(1.f, m_size[axis] / (float)m_child_preferred_size[axis]));
+  int start =
+      (int)(m_pos[axis] + 4 + 1 + (m_size[axis] - 8 - scroll) * m_scroll[1]);
+
+  float delta = 0.f;
+
+  if (p[axis] < start)
+    delta = -m_size[axis] / (float)m_child_preferred_size[axis];
+  else if (p[axis] > start + scroll)
+    delta = m_size[axis] / (float)m_child_preferred_size[axis];
+
+  m_scroll[axis] = std::max(0.f, std::min(1.f, m_scroll[axis] + delta * 0.98f));
+
+  m_children[0]->set_position(-m_scroll * m_overflow);
+  m_update_layout = true;
+  return true;
 }
 
 bool VScrollPanel::scroll_event(const Vector2i &p, const Vector2f &rel) {
@@ -132,11 +145,7 @@ bool VScrollPanel::scroll_event(const Vector2i &p, const Vector2f &rel) {
   if(parent_screen) {
     mods = parent_screen->keyboard_mods();
   }
-  printf("scroll modifiers %d rel %f %f\n", mods, rel[0], rel[1]);
-  // TODO check mouse modifier: with shift we scroll horizontally,
-  // otherwise vertically
   bool is_horizontal = rel[0] != 0.f || (rel[1] != 0.f && mods == GLFW_MOD_SHIFT );
-
   float scroll_delta = is_horizontal ? (rel[0] != 0.f ? rel[0] : rel[1]) : rel[1];
   if (m_overflow[1] > 0 && !is_horizontal) {
     float scroll_amount = scroll_delta * m_size[1] * .25f;
@@ -188,15 +197,15 @@ void VScrollPanel::draw(NVGcontext *ctx) {
       return;
     if (m_overflow[0] >0) {
       // horizontal scrollbar
-      draw_scrollbar(ctx, Axis::X);
+      draw_scrollbar(ctx, 0);
     }
     if (m_overflow[1] > 0) {
       // vertical scrollbar
-      draw_scrollbar(ctx, Axis::Y);
+      draw_scrollbar(ctx, 1);
     }
     return;
 }
-void VScrollPanel::draw_scrollbar(NVGcontext *ctx, Axis axis) {
+void VScrollPanel::draw_scrollbar(NVGcontext *ctx, int axis) {
   // https://stackoverflow.com/a/16367035/8720686
   float viewable_ratio = (float)m_size[axis] / (float)m_child_preferred_size[axis];
   int scrollbar_area = m_size[axis] - 2*m_arrow_size;
@@ -207,7 +216,7 @@ void VScrollPanel::draw_scrollbar(NVGcontext *ctx, Axis axis) {
   int thumb_size = scrollbar_area * viewable_ratio;
   int thumb_position = m_scroll[axis] * (scrollbar_area - thumb_size);
 
-  Axis other_axis = axis == Axis::X ? Axis::Y : Axis::X;
+  int other_axis = !axis;
 
   Vector2i v_scrollbar_pos;
   v_scrollbar_pos[axis] = m_pos[axis];

@@ -48,20 +48,21 @@ public:
     virtual bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
     virtual void draw(NVGcontext *ctx) override;
 
-protected:
+private:
+    void draw_scrollbar(NVGcontext *ctx, int axis);
+
     Vector2i m_child_preferred_size;
     Vector2f m_scroll;
     Vector2f m_overflow;
-    bool m_is_overflow;
-    bool m_update_layout;
-    bool m_both_scrollbars;
-
     // size means width or height, for vertical or horizontal scrollbar respectively
     int m_scrollbar_size;
     int m_arrow_size;
 
-    enum Axis { None = -1, X = 0, Y = 1 };
-    void draw_scrollbar(NVGcontext *ctx, Axis);
+    enum State {Normal = 0, ClickedHScrollBar, ClickedVScrollbar} m_state{Normal};
+
+    bool m_is_overflow;
+    bool m_update_layout;
+    bool m_both_scrollbars;
 };
 
 NAMESPACE_END(nanogui)
